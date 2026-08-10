@@ -1,99 +1,72 @@
-# Decentralised File Sharing P2P
+# Decentralised P2P File Sharing
 
-A small educational peer-to-peer file-sharing system built from scratch.
+A small educational peer-to-peer file-sharing system that sends files directly between computers over TCP.
 
-## V1 — Direct LAN transfer
+## Current version — encrypted CLI
 
-The first version keeps things intentionally simple:
+The project now has a CLI for direct transfers:
 
-- Two PCs on the same local network
-- Direct TCP connection
-- No cloud storage
-- No central file server
-- Files are streamed in 64 KiB chunks
-- Basic filename and file-size metadata
-- Progress display
+```bash
+python p2p.py receive
+python p2p.py send <receiver-ip> <file>
+```
 
-> This is an educational prototype, not a secure internet-wide file-sharing system yet.
+### Install
 
-## Requirements
+Python 3.10+ is recommended.
 
-- Python 3.10+
-- Two PCs connected to the same LAN/Wi-Fi
+```bash
+python -m pip install -r requirements.txt
+```
 
-No third-party packages are required.
-
-## Usage
-
-### 1. Start the receiver
+### Receive
 
 On PC B:
 
 ```bash
-python receiver.py
+python p2p.py receive
 ```
 
-By default it listens on TCP port `5000` and saves files in `received/`.
+### Send
 
-You can choose a different port/output directory:
+On PC A, replace the IP with PC B's LAN IP:
 
 ```bash
-python receiver.py --port 5000 --output received
+python p2p.py send 192.168.1.25 ./example.zip
 ```
 
-Find PC B's local IP address. For example:
-
-```text
-192.168.1.25
-```
-
-### 2. Send a file
-
-On PC A:
-
-```bash
-python sender.py 192.168.1.25 path/to/file.zip
-```
-
-Or with an explicit port:
-
-```bash
-python sender.py 192.168.1.25 path/to/file.zip --port 5000
-```
-
-The receiver will save the file under its `received/` directory.
-
-## How it works
-
-```text
-PC A                              PC B
-Sender                            Receiver
-  │                                  │
-  │──── TCP connection :5000 ──────►│
-  │                                  │
-  │──── metadata ──────────────────►│
-  │──── file chunk ────────────────►│
-  │──── file chunk ────────────────►│
-  │──── file chunk ────────────────►│
-  │                                  │
-  └────────────── done ─────────────►│
-```
-
-The sender first sends a small JSON header containing the filename and file size. The file is then streamed without loading the whole file into memory.
-
-## Roadmap
-
-- [ ] SHA-256 file integrity verification
-- [ ] Better error handling
-- [ ] Transfer speed display
-- [ ] Resume interrupted transfers
-- [ ] Multiple simultaneous peers
-- [ ] Peer discovery
-- [ ] Distributed hash table (DHT)
-- [ ] Peer identities and authentication
-- [ ] NAT traversal
-- [ ] Desktop UI
+Both peers enter the **same strong encryption password** when prompted. Do not put the password in the command line or commit it to the repository.
 
 ## Security
 
-V1 is intentionally minimal. It has **no encryption or authentication**. Only use it on a trusted network for testing.
+- **AES-256-GCM** provides authenticated end-to-end encryption for the file and metadata.
+- A fresh random salt is generated for every transfer.
+- The shared password is converted into a key using **scrypt**.
+- Every data chunk has its own random nonce and authenticated associated data.
+- **SHA-256 verifies file integrity after transfer.** SHA-256 is a hash, not encryption, so it cannot provide confidentiality by itself.
+- If authenticated decryption or the final SHA-256 check fails, the received file is discarded.
+- The connection remains direct TCP; there is no file-storage server in this version.
+
+## Performance
+
+Large files are streamed in 1 MiB chunks instead of being loaded into RAM. AES-GCM is designed for fast authenticated encryption and can benefit from hardware acceleration. Encryption does **not** inherently make the transfer faster; network, disk, CPU, and TCP performance determine the actual speed.
+
+## Important limitation
+
+This is an early LAN-focused protocol, not a production-grade anonymous file-sharing network. The shared password is the trust anchor. A weak password can be guessed offline from the public transfer salt, so use a long random password.
+
+## Roadmap
+
+- [x] Direct TCP file transfer
+- [x] CLI
+- [x] Streaming large files
+- [x] AES-256-GCM authenticated encryption
+- [x] SHA-256 integrity verification
+- [ ] Resume interrupted transfers
+- [ ] LAN peer discovery
+- [ ] Multiple simultaneous peers
+- [ ] Chunk-level distribution
+- [ ] Distributed peer discovery / DHT
+- [ ] Strong peer identities and key exchange
+- [ ] Internet-wide NAT traversal
+- [ ] GUI

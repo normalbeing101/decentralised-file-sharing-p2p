@@ -2,16 +2,23 @@
 
 A small educational peer-to-peer file-sharing system that sends files directly between computers over TCP.
 
-## Current version — encrypted CLI
+## Current version — unified CLI + local web UI
 
-The project now has a CLI for direct transfers:
+There is now **one program** for both sides. Run it without arguments and choose **Send**, **Receive**, or **Web** from the menu.
 
 ```bash
-python p2p.py receive
-python p2p.py send <receiver-ip> <file>
+python p2p.py
 ```
 
-### Install
+You can also use explicit commands:
+
+```bash
+python p2p.py send 192.168.1.25 ./example.zip
+python p2p.py receive
+python p2p.py web
+```
+
+## Install
 
 Python 3.10+ is recommended.
 
@@ -19,49 +26,51 @@ Python 3.10+ is recommended.
 python -m pip install -r requirements.txt
 ```
 
-### Receive
+## Web interface
 
-On PC B:
-
-```bash
-python p2p.py receive
-```
-
-### Send
-
-On PC A, replace the IP with PC B's LAN IP:
+Start the local UI:
 
 ```bash
-python p2p.py send 192.168.1.25 ./example.zip
+python p2p.py web
 ```
 
-Both peers enter the **same strong encryption password** when prompted. Do not put the password in the command line or commit it to the repository.
+Open `http://127.0.0.1:8080` in your browser. It provides simple Send and Receive forms while using the same encrypted transfer engine as the CLI.
 
-## Security
+The web server binds to **localhost by default**. Do not expose it to the LAN unless you deliberately want another device to control the computer running it.
 
-- **AES-256-GCM** provides authenticated end-to-end encryption for the file and metadata.
+## Security model
+
+- **AES-256-GCM** provides authenticated end-to-end encryption for metadata and file chunks.
 - A fresh random salt is generated for every transfer.
-- The shared password is converted into a key using **scrypt**.
-- Every data chunk has its own random nonce and authenticated associated data.
-- **SHA-256 verifies file integrity after transfer.** SHA-256 is a hash, not encryption, so it cannot provide confidentiality by itself.
-- If authenticated decryption or the final SHA-256 check fails, the received file is discarded.
-- The connection remains direct TCP; there is no file-storage server in this version.
+- The shared password is converted into a 256-bit key using **scrypt**.
+- Every encrypted chunk uses a fresh random nonce and authenticated associated data.
+- **SHA-256 verifies the complete file after transfer.** SHA-256 is a hash, not encryption.
+- Wrong passwords, modified frames, invalid metadata, incomplete transfers, and failed integrity checks are rejected.
+- Failed receiving transfers are deleted instead of leaving a corrupted file behind.
+- The connection is direct TCP; there is no file-storage server in this version.
 
 ## Performance
 
-Large files are streamed in 1 MiB chunks instead of being loaded into RAM. AES-GCM is designed for fast authenticated encryption and can benefit from hardware acceleration. Encryption does **not** inherently make the transfer faster; network, disk, CPU, and TCP performance determine the actual speed.
+Files are streamed in 1 MiB chunks, so the CLI does not load an entire large file into RAM. Progress shows percentage, throughput, and ETA. AES-GCM is designed for fast authenticated encryption and can benefit from hardware acceleration. Encryption itself does not guarantee higher network speed.
+
+## Better failure handling
+
+The transfer layer validates protocol magic, frame sizes, metadata, declared file size, authenticated encryption, and final SHA-256. It also uses connection timeouts and avoids silently accepting truncated or modified files.
 
 ## Important limitation
 
-This is an early LAN-focused protocol, not a production-grade anonymous file-sharing network. The shared password is the trust anchor. A weak password can be guessed offline from the public transfer salt, so use a long random password.
+This is an early LAN-focused educational protocol, not production-grade anonymous file sharing. The shared password is the trust anchor. Use a long, random password and keep the web UI on localhost.
 
 ## Roadmap
 
-- [x] Direct TCP file transfer
-- [x] CLI
+- [x] Direct TCP transfer
+- [x] Unified CLI with Send/Receive menu
+- [x] Polished terminal progress UI
 - [x] Streaming large files
 - [x] AES-256-GCM authenticated encryption
 - [x] SHA-256 integrity verification
+- [x] Better protocol/error handling
+- [x] Local web interface
 - [ ] Resume interrupted transfers
 - [ ] LAN peer discovery
 - [ ] Multiple simultaneous peers
@@ -69,4 +78,4 @@ This is an early LAN-focused protocol, not a production-grade anonymous file-sha
 - [ ] Distributed peer discovery / DHT
 - [ ] Strong peer identities and key exchange
 - [ ] Internet-wide NAT traversal
-- [ ] GUI
+- [ ] Full browser streaming for very large uploads
